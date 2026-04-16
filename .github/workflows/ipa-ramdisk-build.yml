@@ -35,7 +35,7 @@ jobs:
             genisoimage \
             kpartx \
             parted \
-            python3-pip \
+            python3-venv \
             qemu-utils \
             squashfs-tools
 
@@ -60,11 +60,11 @@ jobs:
           echo "::notice::Image: ${IMAGE_NAME} | Branch: ${BRANCH} | Constraints: ${CONSTRAINTS}"
 
       - name: Install ironic-python-agent-builder
-        env:
-          PIP_BREAK_SYSTEM_PACKAGES: "1"
         run: |
-          sudo -E pip3 install . \
+          python3 -m venv /opt/ipa-builder
+          /opt/ipa-builder/bin/pip install . \
             -c "${{ steps.meta.outputs.constraints }}"
+          echo "/opt/ipa-builder/bin" >> "${GITHUB_PATH}"
 
       - name: Build IPA ramdisk
         env:
