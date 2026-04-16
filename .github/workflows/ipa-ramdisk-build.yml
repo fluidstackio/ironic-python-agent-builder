@@ -78,10 +78,10 @@ jobs:
             --branch "${{ vars.IPA_OPENSTACK_BRANCH }}" \
             --verbose \
             centos
-          
-            tar czvf "${{ steps.meta.outputs.image_name }}.tar.gz" "${{ steps.meta.outputs.image_name }}"*
 
-            sha256sum "${{ steps.meta.outputs.image_name }}.tar.gz" > "${{ steps.meta.outputs.image_name }}.tar.gz.sha256"
+          IMAGE="${{ steps.meta.outputs.image_name }}"
+          tar czvf "${IMAGE}.tar.gz" "${IMAGE}.kernel" "${IMAGE}.initramfs" "${IMAGE}.sha256" "${IMAGE}.d"
+          sha256sum "${IMAGE}.tar.gz" > "${IMAGE}.tar.gz.sha256"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
