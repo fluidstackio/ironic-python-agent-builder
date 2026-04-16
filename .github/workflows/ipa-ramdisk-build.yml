@@ -6,7 +6,7 @@ name: "[IPA] Build ramdisk and upload to S3"
 on:
   push:
     branches:
-      - master
+      - main
   workflow_dispatch:
 
 concurrency:
