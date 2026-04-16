@@ -90,11 +90,9 @@ jobs:
           aws-region: ${{ vars.FS_ARTIFACTS_AWS_REGION }}
 
       - name: Upload artifacts to S3
-        env:
-          FS_ARTIFACTS_BUCKET: fluidstack-artifacts
         run: |
           IMAGE="${{ steps.meta.outputs.image_name }}"
-          S3_PREFIX="s3://${FS_ARTIFACTS_BUCKET}/fluidstack/finz/ipa"
+          S3_PREFIX="s3://${{ vars.FS_ARTIFACTS_BUCKET }}/fluidstack/finz/ipa"
           for ext in tar.gz tar.gz.sha256; do
             aws s3 cp "${IMAGE}.${ext}" "${S3_PREFIX}/${IMAGE}.${ext}"
             echo "::notice::Uploaded ${IMAGE}.${ext}"
