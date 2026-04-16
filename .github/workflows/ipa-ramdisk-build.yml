@@ -42,29 +42,28 @@ jobs:
       - name: Derive build metadata
         id: meta
         run: |
-          BRANCH="${GITHUB_REF_NAME}"
-          BRANCH_PATH="${BRANCH//\//-}"
+          IPA_BRANCH="${{ vars.IPA_OPENSTACK_BRANCH }}"
+          BRANCH_PATH="${IPA_BRANCH//\//-}"
           IMAGE_NAME="ipa-centos9-${BRANCH_PATH}-fs"
 
           # Map branch to OpenStack constraints series
-          if [[ "${BRANCH}" == stable/* ]]; then
-            SERIES="${BRANCH#stable/}"
+          if [[ "${IPA_BRANCH}" == stable/* ]]; then
+            SERIES="${IPA_BRANCH#stable/}"
           else
             SERIES="master"
           fi
           CONSTRAINTS="https://releases.openstack.org/constraints/upper/${SERIES}"
 
           echo "image_name=${IMAGE_NAME}" >> "${GITHUB_OUTPUT}"
-          echo "branch=${BRANCH}" >> "${GITHUB_OUTPUT}"
           echo "constraints=${CONSTRAINTS}" >> "${GITHUB_OUTPUT}"
-          echo "::notice::Image: ${IMAGE_NAME} | Branch: ${BRANCH} | Constraints: ${CONSTRAINTS}"
+          echo "::notice::Image: ${IMAGE_NAME} | IPA branch: ${IPA_BRANCH} | Constraints: ${CONSTRAINTS}"
 
       - name: Install ironic-python-agent-builder
         run: |
-          python3 -m venv /opt/ipa-builder
-          /opt/ipa-builder/bin/pip install . \
+          python3 -m venv "${HOME}/.local/ipa-builder"
+          "${HOME}/.local/ipa-builder/bin/pip" install . \
             -c "${{ steps.meta.outputs.constraints }}"
-          echo "/opt/ipa-builder/bin" >> "${GITHUB_PATH}"
+          echo "${HOME}/.local/ipa-builder/bin" >> "${GITHUB_PATH}"
 
       - name: Build IPA ramdisk
         env:
@@ -76,7 +75,7 @@ jobs:
             --lzma \
             --output "${{ steps.meta.outputs.image_name }}" \
             --release 9-stream \
-            --branch "${{ steps.meta.outputs.branch }}" \
+            --branch "${{ vars.IPA_OPENSTACK_BRANCH }}" \
             --verbose \
             centos
           
