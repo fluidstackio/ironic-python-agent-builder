@@ -1,0 +1,102 @@
+name: "[IPA] Build ramdisk and upload to S3"
+
+# Builds the Ironic Python Agent ramdisk using diskimage-builder and uploads
+# the resulting package to the fluidstack-artifacts S3 bucket.
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: ipa-ramdisk-${{ github.ref }}
+  cancel-in-progress: false # never cancel an in-flight build
+
+jobs:
+  build-and-upload:
+    name: Build IPA ramdisk and upload to S3
+    runs-on: depot-ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            curl \
+            dosfstools \
+            gdisk \
+            genisoimage \
+            kpartx \
+            parted \
+            python3-pip \
+            qemu-utils \
+            squashfs-tools
+
+      - name: Derive build metadata
+        id: meta
+        run: |
+          BRANCH="${GITHUB_REF_NAME}"
+          BRANCH_PATH="${BRANCH//\//-}"
+          IMAGE_NAME="ipa-centos9-${BRANCH_PATH}-fs"
+
+          # Map branch to OpenStack constraints series
+          if [[ "${BRANCH}" == stable/* ]]; then
+            SERIES="${BRANCH#stable/}"
+          else
+            SERIES="master"
+          fi
+          CONSTRAINTS="https://releases.openstack.org/constraints/upper/${SERIES}"
+
+          echo "image_name=${IMAGE_NAME}" >> "${GITHUB_OUTPUT}"
+          echo "branch=${BRANCH}" >> "${GITHUB_OUTPUT}"
+          echo "constraints=${CONSTRAINTS}" >> "${GITHUB_OUTPUT}"
+          echo "::notice::Image: ${IMAGE_NAME} | Branch: ${BRANCH} | Constraints: ${CONSTRAINTS}"
+
+      - name: Install ironic-python-agent-builder
+        env:
+          PIP_BREAK_SYSTEM_PACKAGES: "1"
+        run: |
+          sudo -E pip3 install . \
+            -c "${{ steps.meta.outputs.constraints }}"
+
+      - name: Build IPA ramdisk
+        env:
+          # Increase from default 30s — mirrors the upstream Zuul job
+          DIB_DHCP_TIMEOUT: "60"
+          DIB_IPA_ENABLE_RESCUE: "false"
+        run: |
+          ironic-python-agent-builder \
+            --lzma \
+            --output "${{ steps.meta.outputs.image_name }}" \
+            --release 9-stream \
+            --branch "${{ steps.meta.outputs.branch }}" \
+            --verbose \
+            centos
+          
+            tar czvf "${{ steps.meta.outputs.image_name }}.tar.gz" "${{ steps.meta.outputs.image_name }}"*
+
+            sha256sum "${{ steps.meta.outputs.image_name }}.tar.gz" > "${{ steps.meta.outputs.image_name }}.tar.gz.sha256"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.FS_ARTIFACTS_AWS_ACCOUNT_ID }}:role/${{ vars.FS_ARTIFACTS_S3_AWS_ROLE_NAME }}
+          aws-region: ${{ vars.FS_ARTIFACTS_AWS_REGION }}
+
+      - name: Upload artifacts to S3
+        env:
+          FS_ARTIFACTS_BUCKET: fluidstack-artifacts
+        run: |
+          IMAGE="${{ steps.meta.outputs.image_name }}"
+          S3_PREFIX="s3://${FS_ARTIFACTS_BUCKET}/fluidstack/finz/ipa"
+          for ext in .tar.gz .tar.gz.sha256; do
+            aws s3 cp "${IMAGE}.${ext}" "${S3_PREFIX}/${IMAGE}.${ext}"
+            echo "::notice::Uploaded ${IMAGE}.${ext}"
+          done
