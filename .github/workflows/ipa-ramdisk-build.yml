@@ -29,16 +29,19 @@ jobs:
             release: 9-stream
             image_prefix: ipa-centos9
             extra_elements: ""
+            dib_no_tmpfs: ""
           - name: ironwood
             distro: ubuntu
             release: noble
             image_prefix: ipa-ubuntu-noble-ironwood
             extra_elements: "fluidstack-ironwood"
+            dib_no_tmpfs: ""
           - name: gpu-noble
             distro: ubuntu
             release: noble
             image_prefix: ipa-ubuntu-noble-gpu
             extra_elements: "fluidstack-gpu"
+            dib_no_tmpfs: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -97,6 +100,7 @@ jobs:
           DIB_DEV_USER_AUTHORIZED_KEYS: /tmp/ipa-debug-key.pub
           DIB_DEV_USER_PWDLESS_SUDO: "yes"
           MATRIX_EXTRA_ELEMENTS: ${{ matrix.extra_elements }}
+          DIB_NO_TMPFS: ${{ matrix.dib_no_tmpfs }}
         run: |
           EXTRA_ELEMENTS=()
 
