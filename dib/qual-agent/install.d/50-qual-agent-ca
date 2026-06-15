@@ -1,0 +1,15 @@
+#!/bin/bash
+# Lay the Fluidstack Root CA (staged by extra-data.d/15-qual-ca-copy) into the
+# image so qual-agent can verify the orchestrator's server certificate at both
+# enrollment (server-auth TLS) and the subsequent mTLS calls. This is the only
+# trust anchor baked in; per-host certs are obtained at boot via enrollment.
+set -eux
+
+install -d -m 0700 /etc/qual/tls
+
+if [ -f /tmp/in_target.d/qual-orch-ca.pem ]; then
+    install -m 0644 /tmp/in_target.d/qual-orch-ca.pem /etc/qual/tls/ca.crt
+else
+    echo "qual-agent: no orchestrator CA staged (DIB_QUAL_CA_FILE unset);" \
+         "TLS verification of the orchestrator will fail at enrollment." >&2
+fi

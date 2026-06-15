@@ -40,7 +40,7 @@ jobs:
             distro: ubuntu
             release: noble
             image_prefix: ipa-ubuntu-noble-gpu
-            extra_elements: "fluidstack-gpu"
+            extra_elements: "fluidstack-gpu qual-agent"
             dib_no_tmpfs: "1"
     steps:
       - name: Checkout
@@ -91,6 +91,26 @@ jobs:
         run: |
           echo "${{ secrets.IPA_DEBUG_SSH_PUBKEY }}" > /tmp/ipa-debug-key.pub
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.FS_ARTIFACTS_AWS_ACCOUNT_ID }}:role/${{ vars.FS_ARTIFACTS_S3_AWS_ROLE_NAME }}
+          aws-region: ${{ vars.FS_ARTIFACTS_AWS_REGION }}
+
+      # qual-agent variants: pull the binary from S3 and stage the orchestrator
+      # CA so the build can bake them in. Per-host client certs are NOT baked —
+      # they are obtained at boot via enrollment (see dib/qual-agent/README.rst).
+      - name: Stage qual-agent binary and orchestrator CA
+        if: contains(matrix.extra_elements, 'qual-agent')
+        env:
+          QUAL_AGENT_VERSION: ${{ vars.QUAL_AGENT_VERSION }}
+        run: |
+          aws s3 cp \
+            "s3://${{ vars.FS_ARTIFACTS_BUCKET }}/fluidstack/node-qualification/qual-agent-${QUAL_AGENT_VERSION}" \
+            /tmp/qual-agent
+          chmod +x /tmp/qual-agent
+          echo "${{ secrets.QUAL_ORCH_CA }}" > /tmp/qual-orch-ca.pem
+
       - name: Build IPA ramdisk
         env:
           # Increase from default 30s — mirrors the upstream Zuul job
@@ -101,6 +121,11 @@ jobs:
           DIB_DEV_USER_PWDLESS_SUDO: "yes"
           MATRIX_EXTRA_ELEMENTS: ${{ matrix.extra_elements }}
           DIB_NO_TMPFS: ${{ matrix.dib_no_tmpfs }}
+          # qual-agent element inputs (only consumed when the element is built).
+          DIB_QUAL_AGENT_FILE: /tmp/qual-agent
+          DIB_QUAL_CA_FILE: /tmp/qual-orch-ca.pem
+          QUAL_ORCH_ADDR: ${{ vars.QUAL_ORCH_ADDR }}
+          QUAL_ENROLL_ADDR: ${{ vars.QUAL_ENROLL_ADDR }}
         run: |
           EXTRA_ELEMENTS=()
 
@@ -125,12 +150,6 @@ jobs:
           IMAGE="${{ steps.meta.outputs.image_name }}"
           tar czvf "${IMAGE}.tar.gz" "${IMAGE}.kernel" "${IMAGE}.initramfs" "${IMAGE}.sha256" "${IMAGE}.d"
           sha256sum "${IMAGE}.tar.gz" > "${IMAGE}.tar.gz.sha256"
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
-        with:
-          role-to-assume: arn:aws:iam::${{ vars.FS_ARTIFACTS_AWS_ACCOUNT_ID }}:role/${{ vars.FS_ARTIFACTS_S3_AWS_ROLE_NAME }}
-          aws-region: ${{ vars.FS_ARTIFACTS_AWS_REGION }}
 
       - name: Upload artifacts to S3
         run: |
