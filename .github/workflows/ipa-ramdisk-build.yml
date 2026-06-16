@@ -109,7 +109,12 @@ jobs:
             "s3://${{ vars.FS_ARTIFACTS_BUCKET }}/fluidstack/node-qualification/qual-agent-${QUAL_AGENT_VERSION}" \
             /tmp/qual-agent
           chmod +x /tmp/qual-agent
-          echo "${{ secrets.QUAL_ORCH_CA }}" > /tmp/qual-orch-ca.pem
+          # The Fluidstack Root CA is a public trust anchor (no secret material),
+          # so it is pulled from the artifacts bucket — the single source of truth
+          # for rotation — rather than carried in a GitHub secret.
+          aws s3 cp \
+            "s3://${{ vars.FS_ARTIFACTS_BUCKET }}/fluidstack/node-qualification/qual-orch-root-ca.pem" \
+            /tmp/qual-orch-ca.pem
 
       - name: Build IPA ramdisk
         env:

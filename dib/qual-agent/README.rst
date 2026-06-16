@@ -45,8 +45,12 @@ Build-time variables
   ``--enroll-addr``. Fleet-wide. Defaults to
   ``qual-orchestrator.example.com:9444``.
 * ``DIB_QUAL_CA_FILE`` — path on the build host to the Fluidstack Root CA (PEM).
-  Baked to ``/etc/qual/tls/ca.crt`` so qual-agent trusts the orchestrator. If
-  unset, no CA is baked and TLS verification of the server will fail.
+  The CI job pulls it from S3
+  (``s3://fish-artifacts-.../fluidstack/node-qualification/qual-orch-root-ca.pem``)
+  before the build and points this at the local copy. The Root CA is a public
+  trust anchor, so it lives in the artifacts bucket (single source of truth for
+  rotation), not a secret. Baked to ``/etc/qual/tls/ca.crt`` so qual-agent trusts
+  the orchestrator. If unset, no CA is baked and TLS verification will fail.
 * ``DIB_QUAL_AGENT_FILE`` — path on the build host to the qual-agent binary.
   The CI job pulls it from S3
   (``s3://fish-artifacts-.../fluidstack/node-qualification/qual-agent-<TAG>``)
