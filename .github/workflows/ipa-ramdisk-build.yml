@@ -40,7 +40,7 @@ jobs:
             distro: ubuntu
             release: noble
             image_prefix: ipa-ubuntu-noble-gpu
-            extra_elements: "fluidstack-gpu"
+            extra_elements: "fluidstack-gpu qual-agent"
             dib_no_tmpfs: "1"
     steps:
       - name: Checkout
