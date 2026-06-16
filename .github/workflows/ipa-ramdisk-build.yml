@@ -110,8 +110,7 @@ jobs:
             /tmp/qual-agent
           chmod +x /tmp/qual-agent
           # The Fluidstack Root CA is a public trust anchor (no secret material),
-          # so it is pulled from the artifacts bucket — the single source of truth
-          # for rotation — rather than carried in a GitHub secret.
+          # so it is pulled from the artifacts bucket
           aws s3 cp \
             "s3://${{ vars.FS_ARTIFACTS_BUCKET }}/fluidstack/node-qualification/qual-orch-root-ca.pem" \
             /tmp/qual-orch-ca.pem
