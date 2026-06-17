@@ -3,16 +3,14 @@ Qualification hardware manager for Ironic Python Agent.
 
 STAGE 0 — verification spike.
 
-This exposes a single throwaway ``sleep_test`` clean step whose only purpose is
-to verify that a node stays in ``CLEANWAIT`` for the full duration of a
-long-running clean step — i.e. that the agent's heartbeats to the conductor
-sustain ``[conductor] clean_callback_timeout`` rather than the timeout being an
-absolute ceiling from when the step started.
+Exposes a ``sleep_test`` clean step that runs during automated cleaning to
+verify that a node stays in CLEANWAIT for the full duration of a long-running
+step. The production ``qualify_node`` step (Stage 2) replaces this and execs the
+qual-agent binary, which connects to the orchestrator and blocks until the full
+qualification pipeline (single-node, cohort, soak) reaches a terminal verdict.
 
-If that holds, the qualification pipeline (single-node -> cohort -> cluster ->
-multi-hour soak) can run entirely inside this ramdisk while the node is held in
-cleaning, gated by a real ``qualify_node`` clean step that replaces this one in a
-later stage. See docs/qual-clean-timer-verification.md for how to run the test.
+See docs/qualification-workflow.md for the full architecture and
+docs/qual-clean-timer-verification.md for how to run this verification test.
 """
 
 import logging
@@ -23,8 +21,6 @@ from ironic_python_agent import hardware
 
 LOG = logging.getLogger(__name__)
 
-# Default sleep for the verification step. Override at runtime with the env var
-# below to make the experiment shorter/longer without rebuilding the image.
 _DEFAULT_SLEEP_SECONDS = 1200  # 20 minutes
 _SLEEP_ENV = 'QUAL_SLEEP_TEST_SECONDS'
 _LOG_INTERVAL_SECONDS = 30
@@ -41,19 +37,25 @@ class QualificationHardwareManager(hardware.GenericHardwareManager):
 
     def evaluate_hardware_support(self):
         """Activate broadly during the spike so the timer test can run on any
-        available node. This is tightened to GPU hosts once the real
-        ``qualify_node`` step lands.
+        available node. Tightened to GPU hosts once ``qualify_node`` lands.
         """
         return hardware.HardwareSupport.SERVICE_PROVIDER
 
     def get_clean_steps(self, node, ports):
-        """Expose ``sleep_test`` at priority 0 so it is NOT part of automated
-        cleaning — it is invoked explicitly via manual cleaning, which is also
-        the model the real per-SU qualification trigger will use.
+        """Expose ``sleep_test`` as an automated clean step (priority > 0).
+
+        This runs automatically when a node enters cleaning (e.g. after
+        unprovisioning, or on first registration with automatedCleaningMode
+        enabled on the BMH). The production ``qualify_node`` step will use the
+        same model: automated cleaning gates provisioning so every node must
+        pass qualification before it becomes available.
+
+        To disable for specific clusters, set the conductor config override:
+            clean_step_priority_override = deploy.sleep_test:0
         """
         return [{
             'step': 'sleep_test',
-            'priority': 0,
+            'priority': 10,
             'interface': 'deploy',
             'reboot_requested': False,
             'abortable': True,
@@ -62,10 +64,10 @@ class QualificationHardwareManager(hardware.GenericHardwareManager):
     def sleep_test(self, node, ports):
         """Sleep for a configurable duration, logging liveness periodically.
 
-        IPA runs clean steps in a background command thread while its heartbeat
-        loop keeps reporting to the conductor, so this blocking sleep is exactly
-        the condition under test: the node should remain in CLEANWAIT for the
-        whole duration if heartbeats sustain the callback timer.
+        IPA runs clean steps in a background thread while its heartbeat loop
+        keeps reporting to the conductor. This blocking sleep is the condition
+        under test: the node should remain in CLEANWAIT for the whole duration
+        if heartbeats sustain the callback timer.
         """
         try:
             seconds = int(os.environ.get(_SLEEP_ENV, _DEFAULT_SLEEP_SECONDS))
