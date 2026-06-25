@@ -1,0 +1,14 @@
+#!/bin/bash
+# Install the qual-agent binary (staged by extra-data.d/16-qual-agent-binary-copy)
+# into the image at build time.
+#
+# Baking the binary (vs. fetching on boot) means enrollment can run on a freshly
+# booted ramdisk without first depending on a separate download.
+set -eux
+
+if [ -f /tmp/in_target.d/qual-agent ]; then
+    install -m 0755 /tmp/in_target.d/qual-agent /usr/local/bin/qual-agent
+else
+    echo "qual-agent: binary not staged (DIB_QUAL_AGENT_FILE unset);" \
+         "qual-agent.service will fail to start." >&2
+fi

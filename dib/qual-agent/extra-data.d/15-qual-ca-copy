@@ -1,0 +1,14 @@
+#!/bin/bash
+# Runs on the BUILD HOST (outside the chroot). Stages the orchestrator CA so
+# install.d can lay it into the image. Mirrors the ipa ramdisk's 15-ssl-ca-copy.
+
+if [ "${DIB_DEBUG_TRACE:-0}" -gt 0 ]; then
+    set -x
+fi
+
+set -eu
+set -o pipefail
+
+if [ -n "${DIB_QUAL_CA_FILE:=}" ]; then
+    cp "$DIB_QUAL_CA_FILE" "$TMP_HOOKS_PATH/qual-orch-ca.pem"
+fi
