@@ -1,0 +1,4 @@
+# launch-time state written by testing-ipa-with-vm.sh (instance IDs, IPs) — never commit
+sandbox-resources.env
+sandbox-resources.log
+sandbox-resources.env.cleaned-*
