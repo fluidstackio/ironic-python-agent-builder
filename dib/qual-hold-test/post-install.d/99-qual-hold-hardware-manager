@@ -1,0 +1,48 @@
+#!/bin/bash
+# Register the Phase-1 `hold` hardware manager with IPA by copying it into the
+# IPA virtualenv and patching the distribution entry_points.txt. Mirrors
+# dib/fluidstack-ironwood/post-install.d/99-ironwood-hardware-manager.
+# THROWAWAY / SANDBOX ONLY.
+set -eu
+
+SRC=/usr/lib/python3/dist-packages/qual_hold_hardware_manager.py
+IPA_VENV=/opt/ironic-python-agent
+
+if [ ! -d "${IPA_VENV}/lib" ]; then
+    echo "IPA virtualenv not found at ${IPA_VENV}, skipping."
+    exit 0
+fi
+
+VENV_SITE=$(find "${IPA_VENV}/lib" -name "site-packages" -type d | head -1)
+if [ -z "${VENV_SITE}" ]; then
+    echo "Could not find IPA venv site-packages, skipping."
+    exit 0
+fi
+
+cp "${SRC}" "${VENV_SITE}/qual_hold_hardware_manager.py"
+echo "Installed qual_hold_hardware_manager.py -> ${VENV_SITE}/"
+
+DIST_INFO=$(find "${VENV_SITE}" -maxdepth 1 -name "*.dist-info" -path "*ironic_python_agent*" | head -1)
+if [ -z "${DIST_INFO}" ]; then
+    echo "WARNING: IPA dist-info not found, hardware manager may not be discovered."
+    exit 0
+fi
+
+EP_FILE="${DIST_INFO}/entry_points.txt"
+if [ ! -f "${EP_FILE}" ]; then
+    echo "WARNING: ${EP_FILE} not found."
+    exit 0
+fi
+
+if grep -q "qual_hold" "${EP_FILE}"; then
+    echo "Entry point already registered."
+    exit 0
+fi
+
+if grep -q "\[ironic_python_agent.hardware_managers\]" "${EP_FILE}"; then
+    sed -i '/\[ironic_python_agent.hardware_managers\]/a qual_hold = qual_hold_hardware_manager:QualHoldHardwareManager' "${EP_FILE}"
+else
+    printf '\n[ironic_python_agent.hardware_managers]\nqual_hold = qual_hold_hardware_manager:QualHoldHardwareManager\n' >> "${EP_FILE}"
+fi
+
+echo "Registered QualHoldHardwareManager in ${EP_FILE}"
