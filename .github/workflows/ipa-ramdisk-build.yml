@@ -42,6 +42,15 @@ jobs:
             image_prefix: ipa-ubuntu-noble-gpu
             extra_elements: "fluidstack-gpu"
             dib_no_tmpfs: "1"
+          # Qualification image: the gpu-noble stack PLUS the qual-agent element
+          # (agent binary + baked orchestrator CA + config + qual_hold gate).
+          - name: qual
+            distro: ubuntu
+            release: noble
+            image_prefix: ipa-ubuntu-noble-qual
+            extra_elements: "fluidstack-gpu qual-agent"
+            dib_no_tmpfs: "1"
+            qual: true
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -91,6 +100,38 @@ jobs:
         run: |
           echo "${{ secrets.IPA_DEBUG_SSH_PUBKEY }}" > /tmp/ipa-debug-key.pub
 
+      # Qual builds need the orchestrator CA + agent binary from S3 BEFORE the
+      # build (they are baked into the image by the qual-agent element). Non-qual
+      # builds skip this; their AWS creds are configured later for upload only.
+      - name: Configure AWS credentials (qual artifacts)
+        if: ${{ matrix.qual }}
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.FS_ARTIFACTS_AWS_ACCOUNT_ID }}:role/${{ vars.FS_ARTIFACTS_S3_AWS_ROLE_NAME }}
+          aws-region: ${{ vars.FS_ARTIFACTS_AWS_REGION }}
+
+      - name: Fetch and pin qual artifacts
+        if: ${{ matrix.qual }}
+        env:
+          QUAL_S3_PREFIX: s3://${{ vars.FS_ARTIFACTS_BUCKET }}/fluidstack/node-qualification
+          QUAL_ROOT_CA_SHA256: ${{ vars.QUAL_ROOT_CA_SHA256 }}
+        run: |
+          mkdir -p /tmp/qual
+          # Public root CA (trust anchor) -> baked to /etc/qual/tls/ca.crt
+          aws s3 cp "${QUAL_S3_PREFIX}/qual-orch-root-ca.pem" /tmp/qual/qual-orch-root-ca.pem
+          # Agent binary (built in a separate repo, not here)
+          aws s3 cp "${QUAL_S3_PREFIX}/qual-agent" /tmp/qual/qual-agent
+          chmod +x /tmp/qual/qual-agent
+          # Integrity pin. The CA is public, so confidentiality is a non-issue —
+          # this guards against a swapped/tampered object. Enforced when
+          # QUAL_ROOT_CA_SHA256 is set; until then the pin is skipped loudly.
+          if [ -n "${QUAL_ROOT_CA_SHA256}" ]; then
+            echo "${QUAL_ROOT_CA_SHA256}  /tmp/qual/qual-orch-root-ca.pem" | sha256sum -c -
+          else
+            echo "::warning::QUAL_ROOT_CA_SHA256 not set — skipping CA fingerprint pin"
+            openssl x509 -in /tmp/qual/qual-orch-root-ca.pem -noout -fingerprint -sha256
+          fi
+
       - name: Build IPA ramdisk
         env:
           # Increase from default 30s — mirrors the upstream Zuul job
@@ -101,6 +142,13 @@ jobs:
           DIB_DEV_USER_PWDLESS_SUDO: "yes"
           MATRIX_EXTRA_ELEMENTS: ${{ matrix.extra_elements }}
           DIB_NO_TMPFS: ${{ matrix.dib_no_tmpfs }}
+          # Qual-only: paths to the S3-fetched artifacts + fleet-wide addresses.
+          # Empty (and ignored) for non-qual builds — the qual-agent element,
+          # and thus these vars, are only present in the qual matrix entry.
+          DIB_QUAL_CA_FILE: ${{ matrix.qual && '/tmp/qual/qual-orch-root-ca.pem' || '' }}
+          DIB_QUAL_AGENT_FILE: ${{ matrix.qual && '/tmp/qual/qual-agent' || '' }}
+          QUAL_ORCH_ADDR: ${{ vars.QUAL_ORCH_ADDR }}
+          QUAL_ENROLL_ADDR: ${{ vars.QUAL_ENROLL_ADDR }}
         run: |
           EXTRA_ELEMENTS=()
 
