@@ -1,0 +1,19 @@
+[Unit]
+Description=Qual Agent Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# QUAL_ORCH_ADDR / QUAL_ENROLL_ADDR are baked at build time by
+# install.d/55-qual-agent-config. The agent self-enrolls on startup: if no
+# usable client cert is present under /etc/qual/tls/, it generates a key, builds
+# a CSR, calls Enroll over server-auth TLS (verifying the orchestrator against
+# the baked Root CA), persists the issued cert, then proceeds to the mTLS RPCs.
+EnvironmentFile=/etc/qual/qual-agent.env
+ExecStart=/usr/local/bin/qual-agent --orchestrator ${QUAL_ORCH_ADDR} --enroll-addr ${QUAL_ENROLL_ADDR}
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

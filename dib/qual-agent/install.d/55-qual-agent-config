@@ -1,0 +1,17 @@
+#!/bin/bash
+# Bake the fleet-wide runtime config (orchestrator + enroll addresses) into an
+# EnvironmentFile consumed by qual-agent.service. Per-host values — the client
+# cert and key — are NOT written here; the agent obtains them at boot via
+# enrollment and writes them under /etc/qual/tls/.
+set -eux
+
+install -d -m 0700 /etc/qual
+# tls/ holds the baked Root CA (ca.crt) plus the leaf cert + key the agent
+# writes at enrollment (tls.crt / tls.key).
+install -d -m 0700 /etc/qual/tls
+
+cat > /etc/qual/qual-agent.env <<EOF
+QUAL_ORCH_ADDR=${QUAL_ORCH_ADDR}
+QUAL_ENROLL_ADDR=${QUAL_ENROLL_ADDR}
+EOF
+chmod 0644 /etc/qual/qual-agent.env

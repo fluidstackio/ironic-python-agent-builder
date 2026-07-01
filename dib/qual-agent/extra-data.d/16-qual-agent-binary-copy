@@ -1,0 +1,14 @@
+#!/bin/bash
+# Runs on the BUILD HOST (outside the chroot). Stages the qual-agent binary
+# (pulled from S3 by the CI job) so install.d can lay it into the image.
+
+if [ "${DIB_DEBUG_TRACE:-0}" -gt 0 ]; then
+    set -x
+fi
+
+set -eu
+set -o pipefail
+
+if [ -n "${DIB_QUAL_AGENT_FILE:=}" ]; then
+    cp "$DIB_QUAL_AGENT_FILE" "$TMP_HOOKS_PATH/qual-agent"
+fi
