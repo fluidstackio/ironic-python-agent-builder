@@ -6,8 +6,8 @@ so the plan and the code evolve together.
 
 | PR | Scope | Status |
 |----|-------|--------|
-| A | `qual-agent` element (binary from S3) + placeholder configs + this doc | 🟡 in progress |
-| B | CA consumption contract + fold in the `qual_hold` clean-step gate | ⚪ not started |
+| A | `qual-agent` element (binary from S3) + placeholder configs + this doc | ✅ done (`feat/qual-agent`) |
+| B | CA consumption contract + fold in the `qual_hold` clean-step gate | 🟡 in progress (`feat/qual-agent-hold-gate`) |
 | C | CI: fetch + fingerprint-pin the CA (and binary) from S3, add qual build variant | ⚪ not started |
 | D | CA lifecycle: reproducible placeholder mint + expiry alerting | ⚪ not started |
 | E | Docs: README + provisioning-workflow updates | ⚪ not started |
