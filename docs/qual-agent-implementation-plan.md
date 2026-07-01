@@ -6,9 +6,9 @@ so the plan and the code evolve together.
 
 | PR | Scope | Status |
 |----|-------|--------|
-| A | `qual-agent` element (binary from S3) + placeholder configs + this doc | ✅ done (`feat/qual-agent`) |
-| B | CA consumption contract + fold in the `qual_hold` clean-step gate | 🟡 in progress (`feat/qual-agent-hold-gate`) |
-| C | CI: fetch + fingerprint-pin the CA (and binary) from S3, add qual build variant | ⚪ not started |
+| A | `qual-agent` element (binary from S3) + placeholder configs + this doc | ✅ done (`feat/qual-agent`, #19) |
+| B | CA consumption contract + fold in the `qual_hold` clean-step gate | ✅ done (`feat/qual-agent-hold-gate`, #20, sandbox-validated) |
+| C | CI: fetch + fingerprint-pin the CA (and binary) from S3, add qual build variant | 🟡 in progress (`feat/qual-agent-ci`) |
 | D | CA lifecycle: reproducible placeholder mint + expiry alerting | ⚪ not started |
 | E | Docs: README + provisioning-workflow updates | ⚪ not started |
 
@@ -194,9 +194,12 @@ pins the CA, and builds/publishes a qual ramdisk.
 
 **Acceptance:** green build; pin gate works; qual image in S3 carries the CA.
 
-**Decision:** dedicated **`qual`** matrix entry (isolation, recommended) vs. add
-qual elements to **`gpu-noble`** (docs say qualification runs there). Start
-dedicated; fold into gpu-noble once stable.
+**Decision (locked):** a **dedicated `qual` matrix entry** = the full `gpu-noble`
+stack (`fluidstack-gpu`, `dib_no_tmpfs: "1"`) **plus** `--element qual-agent`.
+Keeps qualification isolated from the plain gpu-noble image while carrying all
+its GPU components. The S3 fetch/pin + `DIB_QUAL_*` env are gated on
+`matrix.qual`, so the other three variants are untouched. `QUAL_ROOT_CA_SHA256`
+(repo var) enforces the CA pin; until it's set the pin is skipped with a warning.
 
 **Depends on:** PR A (element accepts the S3 binary). Parallel with PR B.
 
