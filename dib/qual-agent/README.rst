@@ -44,6 +44,24 @@ present under ``/etc/qual/tls/``, the agent:
 Because the ramdisk is ephemeral, the cert lives only in RAM for the
 qualification session — the orchestrator issues short-lived certs.
 
+Qualification gate (clean step)
+-------------------------------
+This element also installs the ``qual_hold`` clean-step hardware manager
+(``qual_hold_hardware_manager.py`` + its ``post-install.d`` registration) — the
+**ramdisk-side half** of qualification. It runs automatically during Ironic
+cleaning (priority > 0, no operator action), parking the node in ``clean wait``
+while the agent qualifies the hardware, and releases on an external signal.
+
+The ``/run/qual/verdict`` file is the single integration seam between the agent
+and the gate:
+
+* ``qual-agent`` (writer): writes ``passed`` or ``failed`` when the orchestrator
+  reaches a terminal state.
+* ``qual_hold`` (reader): polls the file; ``passed`` → cleaning continues (node
+  proceeds); anything else → ``CleaningError`` → ``clean failed`` (held for
+  triage). With no verdict it holds indefinitely (heartbeats keep the clean
+  callback alive).
+
 Build-time variables
 ---------------------
 * ``QUAL_ORCH_ADDR`` — orchestrator mTLS endpoint as ``host:port``, baked into
