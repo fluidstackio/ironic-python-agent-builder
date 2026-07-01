@@ -1,0 +1,7 @@
+#!/bin/bash
+# Enable the qualification unit (unit file laid down by install-static from
+# static/). The agent self-enrolls on startup, so there is no separate
+# enrollment unit to order before it.
+set -eux
+
+systemctl enable qual-agent.service
